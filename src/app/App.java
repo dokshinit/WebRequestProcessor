@@ -122,7 +122,6 @@ public class App {
     }
 
     private static ServiceModel procModel, sendModel;
-    private static int stateUpdateInterval = 200; // миллисекунды
 
     /**
      * Запуск приложения.
@@ -139,7 +138,7 @@ public class App {
 
         while (!isTerminated) {
             updateState();
-            safeTermSleep(stateUpdateInterval);
+            safeTermSleep(200);
         }
     }
 
@@ -519,7 +518,7 @@ public class App {
         outServiceSection(PM);
         out.println(w);
         outServiceSection(SM);
-        out.color(18, bgbase).println(delim1_4);
+        out.color(18, bgbase).println(delim1_4).reset();
     }
 
     /** Создание каталога, если не существует. */
