@@ -1,17 +1,34 @@
 package app.model;
 
+import app.App;
 import app.ExError;
+import app.ReportsMailer;
+import app.report.BaseReport;
+import app.report.ClientCardReport;
+import app.report.ClientTransactionReport;
+import app.report.ClientTurnoverReport;
 import fbdbengine.FB_Connection;
 import fbdbengine.FB_CustomException;
 import fbdbengine.FB_Database;
 import fbdbengine.FB_Query;
+import net.sf.jasperreports.engine.JRException;
 import util.StringTools;
+import xconfig.XConfig;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.sql.SQLException;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
+import static app.App.isUI;
 import static app.App.logger;
+import static app.model.Helper.fmtDT84;
+import static util.DateTools.toMillis;
+import static util.StringTools.isEmptySafe;
 
 /**
  * Модель приложения (сессии пользователя)
@@ -29,25 +46,78 @@ public class AppModel {
     public AppModel() {
     }
 
-    public void configureDB() throws ExError {
+    public int redrawInterval;
+    public String statePath;
+    public ServiceModel procModel, sendModel;
+
+    public void init() throws ExError {
+        int p_loadsize, s_loadsize;
+        int p_delay, s_delay;
+        String base, user, password;
+
+        logger.infof("Загрузка конфигурации...");
         try {
-            db = new FB_Database(false, "127.0.0.1:WebCenter", "SYSDBA", "xxxxxxxx", "UTF-8", false);
+            XConfig cfg = new XConfig();
+            cfg.load("app.config");
+
+            base = cfg.getKey("db.host", "127.0.0.1") + ":" + cfg.getKey("db.alias", "WebCenter");
+            user = cfg.getKey("db.user", "REQUESTPROCESSOR");
+            password = cfg.getKey("db.password", "xxxxxxxx");
+
+            p_loadsize = cfg.getIntKey("processor.loadsize", 10);
+            p_delay = cfg.getIntKey("processor.delay", 5000);
+
+            s_loadsize = cfg.getIntKey("sender.loadsize", 10);
+            s_delay = cfg.getIntKey("sender.delay", 5000);
+
+            if (isUI) {
+                redrawInterval = cfg.getIntKey("ui.redraw", 250);
+            } else {
+                redrawInterval = cfg.getIntKey("noui.redraw", 5000);
+                statePath = cfg.getKey("noui.path", "./state");
+            }
+
+        } catch (Exception ex) {
+            base = "127.0.0.1:WebCenter";
+            user = "REQUESTPROCESSOR";
+            password = "xxxxxxxx";
+            p_loadsize = s_loadsize = 10;
+            p_delay = s_delay = 5000;
+            redrawInterval = isUI ? 250 : 5000;
+            statePath = "./state";
+
+            logger.infof("Ошибка загрузки конфигурации: %s! Приняты параметры по умолчанию!", ex.getMessage());
+        }
+
+
+        logger.infof("Настройка подключения к БД...");
+        try {
+            db = new FB_Database(false, base, user, password, "UTF-8", false);
         } catch (Exception ex) {
             throw new ExError("Ошибка настройки параметров БД!", ex);
         }
+
+
+        procModel = new ServiceModel(ServiceModel.Kind.PROCESSOR, p_loadsize, p_delay);
+        sendModel = new ServiceModel(ServiceModel.Kind.SENDER, s_loadsize, s_delay);
+
     }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     // Вспомогательный инструментарий для операций с БД.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /** Интерфейс для вызова обработчика операции с БД. */
+    /**
+     * Интерфейс для вызова обработчика операции с БД.
+     */
     @FunctionalInterface
     interface QFBBeforeTask {
         void run() throws ExError;
     }
 
-    /** Интерфейс для вызова обработчика операции с БД. */
+    /**
+     * Интерфейс для вызова обработчика операции с БД.
+     */
     @FunctionalInterface
     interface QFBTask {
         void run(final FB_Connection con) throws ExError, SQLException, Exception;
@@ -58,7 +128,9 @@ public class AppModel {
         void run(Throwable ex) throws ExError;
     }
 
-    /** Хелпер для операций с БД. */
+    /**
+     * Хелпер для операций с БД.
+     */
     void QFB(FB_Connection con, QFBBeforeTask btask, QFBTask task, QFBErrorTask etask) throws ExError {
         if (btask != null) btask.run();
         boolean isextcon = con != null;
@@ -97,7 +169,9 @@ public class AppModel {
         }
     }
 
-    /** Хелпер для операций с БД. Без обработчика до соединения с БД. */
+    /**
+     * Хелпер для операций с БД. Без обработчика до соединения с БД.
+     */
     void QFB(FB_Connection con, QFBTask task) throws ExError {
         QFB(con, null, task, null);
     }
@@ -149,7 +223,7 @@ public class AppModel {
 
     public void updateRequestProcess(Request req) throws ExError {
         QFB((con) -> {
-            FB_Query q = con.execute("SELECT DTPROCESS FROM W_REQUEST_PROCESS(?,?,?,?,?)",
+            FB_Query q = con.execute("SELECT DTPROCESS FROM WP_REQUEST_PROCESS(?,?,?,?,?)",
                     req.getId(), req.getState().id, req.getResult(), req.getFileName(), req.getFileSize());
             if (!q.next()) throw new ExError("Ошибка сохранения заявки при обработке!");
             req.updateByProcess(q.getLocalDateTime("DTPROCESS"));
@@ -160,7 +234,7 @@ public class AppModel {
 
     public void updateRequestSend(Request req) throws ExError {
         QFB((con) -> {
-            FB_Query q = con.execute("SELECT ISENDTRYREMAIN, DTSENDTRY, DTSEND FROM W_REQUEST_SEND(?,?,?)", req.getId(), req.getState().id, req.getResult());
+            FB_Query q = con.execute("SELECT ISENDTRYREMAIN, DTSENDTRY, DTSEND FROM WP_REQUEST_SEND(?,?,?)", req.getId(), req.getState().id, req.getResult());
             if (!q.next()) throw new ExError("Ошибка сохранения заявки при ответе!");
             req.updateBySend(q.getInteger("ISENDTRYREMAIN"), q.getLocalDateTime("DTSENDTRY"), q.getLocalDateTime("DTSEND"));
             q.closeSafe();
@@ -259,5 +333,39 @@ public class AppModel {
             q.closeSafe();
         });
         return list;
+    }
+
+
+    /**
+     * Создание каталога, если не существует.
+     */
+    public static File createDirectoryIfNotExist(String path) throws ExError {
+        try {
+            File dir = new File(path);
+            if (!dir.exists()) {
+                if (!dir.mkdir()) {
+                    throw new ExError("Ошибка создания каталога!");
+                }
+            }
+            return dir;
+        } catch (ExError ex) {
+            throw ex;
+        } catch (Exception e) {
+            throw new ExError(e, "Ошибка создания каталога!");
+        }
+    }
+
+    /**
+     * Безопасное удаление файла.
+     */
+    public static void deleteFileSafe(String path) {
+        try {
+            File file = new File(path);
+            if (file.exists()) {
+                // Если не удалился сразу - пробуем удалить при выходе на случай, если залочен.
+                if (!file.delete()) file.deleteOnExit();
+            }
+        } catch (Exception ignore) {
+        }
     }
 }
