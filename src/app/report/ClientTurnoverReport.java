@@ -101,7 +101,9 @@ public class ClientTurnoverReport extends BaseReport<ClientTurnoverReport> {
 
         @Override
         protected ArrayList<Saldo> loadData(int skip, int limit) throws ExError {
-            return model.loadClientSaldos(client.getFirm().id, client.getIdd(), client.getIddSub(), isStart ? dtStart : dtEnd);
+            // Для начальной даты - отнимаем день, т.к. сальдо на конец дня.
+            return model.loadClientSaldos(client.getFirm().id, client.getIdd(), client.getIddSub(),
+                    isStart ? dtStart.minusDays(1) : dtEnd);
         }
     }
 

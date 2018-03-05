@@ -137,7 +137,7 @@ public class Request {
     }
 
     private Integer id;
-    private Integer iddClient, iddSub;
+    private Integer idUser, iddClient, iddSub;
     private LocalDateTime dtCreate;
     private Type type;
     private Integer idSubType;
@@ -158,10 +158,11 @@ public class Request {
 
     private ArrayList<CardItem> cardItems;
 
-    public Request(Integer id, Integer iddClient, Integer iddSub, LocalDateTime dtCreate, Integer iType, Integer iSubType,
+    public Request(Integer id, Integer idUser, Integer iddClient, Integer iddSub, LocalDateTime dtCreate, Integer iType, Integer iSubType,
                    String paramsTitle, String params, String comment, Integer istate, LocalDateTime dtProcess,
                    String fileName, Integer fileSize, Integer sendTryRemain, LocalDateTime dtSendTry, LocalDateTime dtSend, String result) {
         this.id = id;
+        this.idUser = idUser;
         this.iddClient = iddClient;
         this.iddSub = iddSub;
         this.type = Type.byId(iType);
@@ -245,6 +246,10 @@ public class Request {
 
     public Integer getId() {
         return id;
+    }
+
+    public Integer getIdUser() {
+        return idUser;
     }
 
     public Integer getIddClient() {

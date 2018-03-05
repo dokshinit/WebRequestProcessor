@@ -18,7 +18,6 @@ import java.util.ArrayList;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import static app.App.logger;
 import static app.App.model;
 import static app.model.Helper.fmtDT84;
 import static util.DateTools.toMillis;
@@ -193,7 +192,7 @@ public class ServiceModel {
         this.errMessage = err;
     }
 
-    private void processReportRequest(Request req) {
+    private void processReportRequest(Request req) throws ExError {
 
         BaseReport report;
         Client client;
@@ -204,14 +203,14 @@ public class ServiceModel {
                 case TURNOVER:
                     dtstart = req.getParamAsLocalDate("dtStart");
                     dtend = req.getParamAsLocalDate("dtEnd");
-                    client = model.loadClient(req.getIddClient(), req.getIddSub(), dtend);
+                    client = model.loadClient(req, dtend);
                     report = new ClientTurnoverReport(client, dtstart, dtend);
                     break;
 
                 case TRANSACTION:
                     dtstart = req.getParamAsLocalDate("dtStart");
                     dtend = req.getParamAsLocalDate("dtEnd");
-                    client = model.loadClient(req.getIddClient(), req.getIddSub(), dtend);
+                    client = model.loadClient(req, dtend);
                     Integer iddAzs = req.getParamAsInteger("iddAzs");
                     ClientTransactionReport.Mode mode = ClientTransactionReport.Mode.byId(req.getParamAsInteger("idReportMode"));
                     report = new ClientTransactionReport(client, dtstart, dtend, iddAzs, mode);
@@ -219,7 +218,7 @@ public class ServiceModel {
 
                 case CARD:
                     dtw = req.getParamAsLocalDate("dtw");
-                    client = model.loadClient(req.getIddClient(), req.getIddSub(), dtw);
+                    client = model.loadClient(req, dtw);
                     Card.WorkState workState = Card.WorkState.byId(req.getParamAsInteger("idWorkState"));
                     ClientCardReport.Mode mode2 = ClientCardReport.Mode.byId(req.getParamAsInteger("idReportMode"));
                     report = new ClientCardReport(client, dtw, workState, mode2);
@@ -288,12 +287,14 @@ public class ServiceModel {
                 model.updateRequestProcess(req);
             } catch (Exception ignore) {
             }
+
+            throw ex;
         }
     }
 
-    private void sendAnswerForReportRequest(Request req) {
+    private void sendAnswerForReportRequest(Request req) throws ExError {
         try {
-            Client client = model.loadClient(req.getIddClient(), req.getIddSub(), LocalDate.now());
+            Client client = model.loadClient(req, LocalDate.now());
 
             ReportsMailer mailer = new ReportsMailer("smtp.tp-rk.ru", "reports@tp-rk.ru", "XuQ9eb9hqZ");
 
@@ -302,24 +303,31 @@ public class ServiceModel {
             sb.println("---");
             sb.println("Данное сообщение сформировано службой автоматической рассылки ответов на заявки,");
             sb.println("созданные в Личном Кабинете (ЛК) клиента Системы Топливных Карт (СТК) %s.", client.getFirm().getTitle());
-            sb.println("Не отвечайте на это письмо, входящие сообщения на данный адрес заблокрованы.");
+            sb.println("Не отвечайте на это письмо, входящие сообщения на данный адрес заблокированы.");
 
             //if (true) throw new ExError("123");
             mailer.sendMail("PC.FCService", client.getEmail(), null, "Автоматический ответ за заявку ЛК СТК!", sb.toString(),
                     req.getAnswerPath() + File.separator + req.getFileName());
-            logger.infof("SEND ANSWER: %d of %s", req.getId(), fmtDT84(req.getDtCreate()));
 
-            req.setState(Request.State.FINISHED, null);
+            // Меняем статус заявки на завершенный.
+            try {
+                req.setState(Request.State.FINISHED, null);
+                model.updateRequestSend(req);
+            } catch (Exception ex) {
+                throw new ExError("Ошибка изменения состояния заявки в БД!");
+            }
 
-        } catch (Exception mex) {
-            logger.error("Ошибка отправки ответа на заявку!", mex);
+        } catch (Exception ex) {
             if (req.getSendTryRemain() != null && req.getSendTryRemain() <= 1) {
                 req.setState(Request.State.ERROR, "Ошибка отправки ответа на заявку!");
             }
-        }
-        try {
-            model.updateRequestSend(req);
-        } catch (Exception ignore) {
+            try {
+                model.updateRequestSend(req);
+            } catch (Exception ignore) {
+            }
+
+            if (ex instanceof ExError) throw (ExError) ex;
+            throw new ExError("Ошибка отправки ответа на заявку! (%s)", ex.getMessage());
         }
     }
 }

@@ -12,7 +12,9 @@ import util.StringTools;
 
 import java.io.File;
 import java.io.FileWriter;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.logging.Level;
 
@@ -73,6 +75,12 @@ public class App {
         }
     }
 
+    static LoggerExt.FileUpdateCheck byMinutes = (log) -> {
+        LocalTime now = LocalTime.now();
+        LocalTime tm = log.getFileDT().toLocalTime();
+        return now.getHour() != tm.getHour() || now.getMinute() != tm.getMinute();
+    };
+
     /**
      * Инициализация лога.
      */
@@ -82,7 +90,7 @@ public class App {
         // Логгируем все сообщения.
         logger.setLevel(Level.ALL);
         // Настраиваем логгер для файлового вывода.
-        logger.enable(true).toFile();
+        logger.enable(true).toFile(); //logger.getFilePath(), "%1$s_%3$tH%3$tM.logx", byMinutes
 
         procLogger.setLevel(Level.ALL);
         procLogger.enable(true).toFile();
@@ -147,6 +155,7 @@ public class App {
     private static void serviceThreadBody(ServiceModel mod) {
         logger.infof("Старт сервиса: %s", mod.getName()); // обработки заявок.
         ServiceModel.Kind kind = mod.startService();
+        LoggerExt log = kind == ServiceModel.Kind.PROCESSOR ? procLogger : sendLogger;
 
         ArrayList<Request> emptylist = new ArrayList<>();
 
@@ -158,23 +167,23 @@ public class App {
                 its = mod.loadRequests();
             } catch (Exception ex) {
                 errmsg = ex.getMessage();
-                procLogger.error("Ошибка запроса заявок!", ex);
+                log.error("Ошибка запроса заявок!", ex);
             }
             mod.endDataLoad(its, errmsg);
 
             if (errmsg == null && !its.isEmpty()) {
                 mod.startBlockProcess();
                 for (Request request : its) {
+                    log.infof("Обработка: №%d от %s", request.getId(), fmtDT86(request.getDtCreate()));
                     mod.startProcess(request);
                     errmsg = null;
                     try {
                         mod.processRequest(request);
                     } catch (Exception ex) {
                         errmsg = ex.getMessage();
-                        procLogger.error("Ошибка обработки заявки!", ex);
+                        log.error("Ошибка обработки заявки!", ex);
                     }
                     mod.endProcess(errmsg);
-                    procLogger.infof("Обработка: №%d от %s", request.getId(), fmtDT86(request.getDtCreate()));
                     if (safeTermSleep(100)) return;
                 }
             }

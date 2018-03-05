@@ -183,16 +183,19 @@ public class AppModel {
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     //
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    public Client loadClient(int iddclient, int iddsub, LocalDate dtw) throws ExError {
+    public Client loadClient(Request req, LocalDate dtw) throws ExError {
         Client[] res = {null};
         QFB((con) -> {
-            FB_Query q = con.execute("SELECT IDDFIRM, IDDCLIENT, IDDSUB, CINN, CNAME, CTITLE, CSUBTITLE, CADDRESS, CEMAIL," +
+            FB_Query q = con.execute("SELECT CUSEREMAIL, IDDFIRM, IDDCLIENT, IDDSUB, CINN, CNAME, " +
+                    " CTITLE, CSUBTITLE, CADDRESS, CEMAIL," +
                     " CPHONE, IBFOND, IBWORK, COILLIMIT, CAZSLIMIT, CCOMMENT, DBCREDIT" +
-                    " FROM WP_CLIENT_GET(?,?,?)", iddclient, iddsub, dtw);
+                    " FROM WP_CLIENT_GET(?,?,?,?)", req.getIdUser(), req.getIddClient(), req.getIddSub(), dtw);
             if (!q.next()) throw new ExError("Клиент не найден!");
+            String email = q.getString("CUSEREMAIL");
+            if (isEmptySafe(email)) email = q.getString("CEMAIL");
             res[0] = new Client(q.getInteger("IDDFIRM"), q.getInteger("IDDCLIENT"), q.getInteger("IDDSUB"),
                     q.getString("CINN"), q.getString("CNAME"), q.getString("CTITLE"), q.getString("CSUBTITLE"),
-                    q.getString("CADDRESS"), q.getString("CEMAIL"), q.getString("CPHONE"),
+                    q.getString("CADDRESS"), email, q.getString("CPHONE"),
                     q.getIntegerAsBoolean("IBFOND"), q.getInteger("IBWORK"),
                     q.getString("COILLIMIT"), q.getString("CAZSLIMIT"), q.getString("CCOMMENT"),
                     q.getLong("DBCREDIT"));
@@ -204,12 +207,14 @@ public class AppModel {
     public ArrayList<Request> loadRequests(Request.State state, int maxcount) throws ExError {
         ArrayList<Request> list = new ArrayList<>();
         QFB((con) -> {
-            FB_Query q = con.execute("SELECT FIRST " + maxcount
-                    + " ID, IDDCLIENT, IDDSUB, DTCREATE, ITYPE, ISUBTYPE, CPARAMSTITLE, CPARAMS, CCOMMENT, ISTATE, DTPROCESS, CFILENAME, "
-                    + " IFILESIZE, ISENDTRYREMAIN, DTSENDTRY, DTSEND, CRESULT FROM WP_REQUEST_LIST(?) ORDER BY DTCREATE", state.id);
+            FB_Query q = con.execute("SELECT FIRST " + maxcount +
+                    " ID, IDUSER, IDDCLIENT, IDDSUB, DTCREATE, ITYPE, ISUBTYPE, CPARAMSTITLE, CPARAMS, CCOMMENT, " +
+                    " ISTATE, DTPROCESS, CFILENAME, IFILESIZE, ISENDTRYREMAIN, DTSENDTRY, DTSEND, CRESULT " +
+                    " FROM WP_REQUEST_LIST(?) ORDER BY DTCREATE", state.id);
             while (q.next()) {
                 list.add(new Request(
-                        q.getInteger("ID"), q.getInteger("IDDCLIENT"), q.getInteger("IDDSUB"), q.getLocalDateTime("DTCREATE"),
+                        q.getInteger("ID"), q.getInteger("IDUSER"), q.getInteger("IDDCLIENT"),
+                        q.getInteger("IDDSUB"), q.getLocalDateTime("DTCREATE"),
                         q.getInteger("ITYPE"), q.getInteger("ISUBTYPE"), q.getString("CPARAMSTITLE"), q.getString("CPARAMS"),
                         q.getString("CCOMMENT"), q.getInteger("ISTATE"),
                         q.getLocalDateTime("DTPROCESS"), q.getString("CFILENAME"), q.getInteger("IFILESIZE"),
@@ -234,7 +239,8 @@ public class AppModel {
 
     public void updateRequestSend(Request req) throws ExError {
         QFB((con) -> {
-            FB_Query q = con.execute("SELECT ISENDTRYREMAIN, DTSENDTRY, DTSEND FROM WP_REQUEST_SEND(?,?,?)", req.getId(), req.getState().id, req.getResult());
+            FB_Query q = con.execute("SELECT ISENDTRYREMAIN, DTSENDTRY, DTSEND FROM WP_REQUEST_SEND(?,?,?)",
+                    req.getId(), req.getState().id, req.getResult());
             if (!q.next()) throw new ExError("Ошибка сохранения заявки при ответе!");
             req.updateBySend(q.getInteger("ISENDTRYREMAIN"), q.getLocalDateTime("DTSENDTRY"), q.getLocalDateTime("DTSEND"));
             q.closeSafe();
