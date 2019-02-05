@@ -5,18 +5,13 @@
 
 package app;
 
-import util.StringTools.TextBuilder;
-
-import java.io.File;
-import java.io.UnsupportedEncodingException;
-import java.net.InetAddress;
-import java.text.SimpleDateFormat;
-import java.util.*;
 import javax.activation.DataHandler;
-import javax.activation.DataSource;
 import javax.activation.FileDataSource;
 import javax.mail.*;
 import javax.mail.internet.*;
+import java.io.File;
+import java.io.UnsupportedEncodingException;
+import java.util.Properties;
 
 /**
  * Класс для рассылки автоматических сообщений.

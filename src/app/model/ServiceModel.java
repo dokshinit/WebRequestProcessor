@@ -3,6 +3,7 @@ package app.model;
 import app.App;
 import app.ExError;
 import app.ReportsMailer;
+import app.export.Export;
 import app.report.BaseReport;
 import app.report.ClientCardReport;
 import app.report.ClientTransactionReport;
@@ -153,13 +154,15 @@ public class ServiceModel {
         curItem = req;
     }
 
+    /** Обработка заявки. */
     public void processRequest(Request req) throws ExError {
         switch (kind) {
             case PROCESSOR:
-                processReportRequest(req);
+                processRequestImpl(req);
                 break;
+
             case SENDER:
-                sendAnswerForReportRequest(req);
+                sendAnswerForRequest(req); // Ответы рассылаем единообразные.
                 break;
         }
     }
@@ -192,80 +195,23 @@ public class ServiceModel {
         this.errMessage = err;
     }
 
-    private void processReportRequest(Request req) throws ExError {
-
-        BaseReport report;
-        Client client;
-        LocalDate dtstart, dtend, dtw;
-
+    /** Обработчик заявок, ожидающих обработки (вся общая часть вынесена в этот метод). */
+    private void processRequestImpl(Request req) throws ExError {
         try {
-            switch (req.getReportType()) {
-                case TURNOVER:
-                    dtstart = req.getParamAsLocalDate("dtStart");
-                    dtend = req.getParamAsLocalDate("dtEnd");
-                    client = model.loadClient(req, dtend);
-                    report = new ClientTurnoverReport(client, dtstart, dtend);
+            switch (req.getType()) {
+                case REPORT:
+                    processReportRequest(req);
                     break;
-
-                case TRANSACTION:
-                    dtstart = req.getParamAsLocalDate("dtStart");
-                    dtend = req.getParamAsLocalDate("dtEnd");
-                    client = model.loadClient(req, dtend);
-                    Integer iddAzs = req.getParamAsInteger("iddAzs");
-                    ClientTransactionReport.Mode mode = ClientTransactionReport.Mode.byId(req.getParamAsInteger("idReportMode"));
-                    report = new ClientTransactionReport(client, dtstart, dtend, iddAzs, mode);
+                case EXPORT:
+                    processExportRequest(req);
                     break;
-
-                case CARD:
-                    dtw = req.getParamAsLocalDate("dtw");
-                    client = model.loadClient(req, dtw);
-                    Card.WorkState workState = Card.WorkState.byId(req.getParamAsInteger("idWorkState"));
-                    ClientCardReport.Mode mode2 = ClientCardReport.Mode.byId(req.getParamAsInteger("idReportMode"));
-                    report = new ClientCardReport(client, dtw, workState, mode2);
-                    break;
-
                 default:
-                    throw new ExError("Неизвестный вид отчёта!");
-            }
-
-            String path = req.getAnswerPath();
-            model.createDirectoryIfNotExist(path);
-
-            try {
-                // Генерируем отчёт.
-                report.build();
-            } catch (ExError ex) {
-                // Облом. завершаем запрос или ввести счётчик попыток?
-                throw new ExError("Ошибка построения отчёта!");
-            }
-
-
-            String name = req.getAutoFileName();
-            String filenamePDF = name + ".pdf";
-            String filenameZIP = name + ".zip";
-            String fullfilenameZIP = path + File.separator + filenameZIP;
-            try {
-                File file = new File(fullfilenameZIP);
-                FileOutputStream fos = new FileOutputStream(file);
-                ZipOutputStream outs = new ZipOutputStream(fos);
-                ZipEntry ze = new ZipEntry(filenamePDF);
-                outs.putNextEntry(ze);
-                report.exportToPDF(outs);
-                outs.closeEntry();
-                outs.close();
-
-                req.setFile(filenameZIP, (int) file.length());
-
-            } catch (JRException ex) {
-                model.deleteFileSafe(fullfilenameZIP);
-                throw new ExError("Ошибка механизма экспорта отчёта!");
-            } catch (Exception ex) {
-                model.deleteFileSafe(fullfilenameZIP);
-                throw new ExError("Ошибка экспорта отчёта!");
+                    throw new ExError("Неизвестный тип заявки!");
             }
 
             // Меняем статус заявки на завершенный или ожидающий отправки.
             try {
+                Client client = model.loadClient(req, req.dtCreate.toLocalDate()); // По умолчанию читаем на дату создания заявки.
                 if (req.getSendTryRemain() != null && req.getSendTryRemain() > 0 && !isEmptySafe(client.getEmail())) {
                     req.setState(Request.State.SENDING, null);
                 } else {
@@ -277,7 +223,7 @@ public class ServiceModel {
             }
 
         } catch (Exception ex) {
-            // Облом. завершаем запрос или ввести счётчик попыток?
+            // Облом. завершаем заявку или ввести счётчик попыток?
             if (req.getState() != Request.State.ERROR) {
                 req.setState(Request.State.ERROR, ex.getMessage());
             } else {
@@ -287,12 +233,130 @@ public class ServiceModel {
                 model.updateRequestProcess(req);
             } catch (Exception ignore) {
             }
-
             throw ex;
         }
     }
 
-    private void sendAnswerForReportRequest(Request req) throws ExError {
+    /** Обработчик заявки на генерацию отчёта. */
+    private void processReportRequest(Request req) throws ExError {
+
+        BaseReport report;
+        Client client;
+        LocalDate dtstart, dtend, dtw;
+
+        switch (req.getReportType()) {
+            case TURNOVER:
+                dtstart = req.getParamAsLocalDate("dtStart");
+                dtend = req.getParamAsLocalDate("dtEnd");
+                client = model.loadClient(req, dtend);
+                report = new ClientTurnoverReport(client, dtstart, dtend);
+                break;
+
+            case TRANSACTION:
+                dtstart = req.getParamAsLocalDate("dtStart");
+                dtend = req.getParamAsLocalDate("dtEnd");
+                client = model.loadClient(req, dtend);
+                Integer iddAzs = req.getParamAsInteger("iddAzs");
+                ClientTransactionReport.Mode mode = ClientTransactionReport.Mode.byId(req.getReportModeParam());
+                report = new ClientTransactionReport(client, dtstart, dtend, iddAzs, mode);
+                break;
+
+            case CARD:
+                dtw = req.getParamAsLocalDate("dtw");
+                client = model.loadClient(req, dtw);
+                Card.WorkState workState = Card.WorkState.byId(req.getParamAsInteger("idWorkState"));
+                ClientCardReport.Mode mode2 = ClientCardReport.Mode.byId(req.getReportModeParam());
+                report = new ClientCardReport(client, dtw, workState, mode2);
+                break;
+
+            default:
+                throw new ExError("Неизвестный вид отчёта!");
+        }
+
+        String path = req.getAnswerPath();
+        model.createDirectoryIfNotExist(path);
+
+        try {
+            // Генерируем отчёт.
+            report.build();
+        } catch (ExError ex) {
+            // Облом. завершаем заявка или ввести счётчик попыток?
+            throw new ExError("Ошибка построения отчёта!");
+        }
+
+        String name = req.getAutoFileName();
+        String filenamePDF = name + ".pdf";
+        String filenameZIP = name + ".zip";
+        String fullfilenameZIP = path + File.separator + filenameZIP;
+        try {
+            File file = new File(fullfilenameZIP);
+            FileOutputStream fos = new FileOutputStream(file);
+            ZipOutputStream outs = new ZipOutputStream(fos);
+            ZipEntry ze = new ZipEntry(filenamePDF);
+            outs.putNextEntry(ze);
+            report.exportToPDF(outs);
+            outs.closeEntry();
+            outs.close();
+
+            req.setFile(filenameZIP, (int) file.length());
+
+        } catch (JRException ex) {
+            model.deleteFileSafe(fullfilenameZIP);
+            throw new ExError("Ошибка механизма экспорта отчёта!");
+        } catch (Exception ex) {
+            model.deleteFileSafe(fullfilenameZIP);
+            throw new ExError("Ошибка экспорта отчёта!");
+        }
+    }
+
+    /** Обработчик заявки на генерацию экспортных данных. */
+    private void processExportRequest(Request req) throws ExError {
+
+        Export export;
+        Client client;
+        LocalDate dtstart, dtend, dtw;
+
+        switch (req.getExportType()) {
+            case TRANSACTION:
+                dtstart = req.getParamAsLocalDate("dtStart");
+                dtend = req.getParamAsLocalDate("dtEnd");
+                client = model.loadClient(req, dtend);
+                Integer iddAzs = req.getParamAsInteger("iddAzs");
+                Integer mode = req.getExportModeParam();
+                export = new Export(client, dtstart, dtend, iddAzs, mode);
+                break;
+
+            default:
+                throw new ExError("Неизвестный вид экспорта!");
+        }
+
+        String path = req.getAnswerPath();
+        model.createDirectoryIfNotExist(path);
+
+        String name = req.getAutoFileName();
+        String filenamePDF = name + ".xls";
+        String filenameZIP = name + ".zip";
+        String fullfilenameZIP = path + File.separator + filenameZIP;
+        try {
+            File file = new File(fullfilenameZIP);
+            FileOutputStream fos = new FileOutputStream(file);
+            ZipOutputStream outs = new ZipOutputStream(fos);
+            ZipEntry ze = new ZipEntry(filenamePDF);
+            outs.putNextEntry(ze);
+            export.exportTransactions(outs);
+            outs.closeEntry();
+            outs.close();
+
+            req.setFile(filenameZIP, (int) file.length());
+
+        } catch (Exception ex) {
+            model.deleteFileSafe(fullfilenameZIP);
+            throw new ExError("Ошибка экспорта!");
+        }
+    }
+
+    /** Обработчик заявок, ожидающих отправки ответа на заявку. */
+    private void sendAnswerForRequest(Request req) throws ExError {
         try {
             Client client = model.loadClient(req, LocalDate.now());
 

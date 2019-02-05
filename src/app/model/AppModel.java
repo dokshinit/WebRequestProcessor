@@ -1,33 +1,20 @@
 package app.model;
 
-import app.App;
 import app.ExError;
-import app.ReportsMailer;
-import app.report.BaseReport;
-import app.report.ClientCardReport;
-import app.report.ClientTransactionReport;
-import app.report.ClientTurnoverReport;
 import fbdbengine.FB_Connection;
 import fbdbengine.FB_CustomException;
 import fbdbengine.FB_Database;
 import fbdbengine.FB_Query;
-import net.sf.jasperreports.engine.JRException;
 import util.StringTools;
 import xconfig.XConfig;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import static app.App.isUI;
 import static app.App.logger;
-import static app.model.Helper.fmtDT84;
-import static util.DateTools.toMillis;
 import static util.StringTools.isEmptySafe;
 
 /**
