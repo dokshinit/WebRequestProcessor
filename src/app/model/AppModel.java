@@ -94,17 +94,13 @@ public class AppModel {
     // Вспомогательный инструментарий для операций с БД.
     ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-    /**
-     * Интерфейс для вызова обработчика операции с БД.
-     */
+    /** Интерфейс для вызова обработчика операции с БД. */
     @FunctionalInterface
     interface QFBBeforeTask {
         void run() throws ExError;
     }
 
-    /**
-     * Интерфейс для вызова обработчика операции с БД.
-     */
+    /** Интерфейс для вызова обработчика операции с БД. */
     @FunctionalInterface
     interface QFBTask {
         void run(final FB_Connection con) throws ExError, SQLException, Exception;
@@ -115,9 +111,7 @@ public class AppModel {
         void run(Throwable ex) throws ExError;
     }
 
-    /**
-     * Хелпер для операций с БД.
-     */
+    /** Хелпер для операций с БД. */
     void QFB(FB_Connection con, QFBBeforeTask btask, QFBTask task, QFBErrorTask etask) throws ExError {
         if (btask != null) btask.run();
         boolean isextcon = con != null;
@@ -156,9 +150,7 @@ public class AppModel {
         }
     }
 
-    /**
-     * Хелпер для операций с БД. Без обработчика до соединения с БД.
-     */
+    /** Хелпер для операций с БД. Без обработчика до соединения с БД. */
     void QFB(FB_Connection con, QFBTask task) throws ExError {
         QFB(con, null, task, null);
     }
@@ -236,15 +228,15 @@ public class AppModel {
     }
 
     public ArrayList<Transaction> loadClientTransactions(Integer iddfirm, Integer iddclient, Integer iddsub, LocalDate dtstart,
-                                                         LocalDate dtend, Integer iddazs,
+                                                         LocalDate dtend, Integer iddazs, String iddcard,
                                                          int offset, int limit, String sort) throws ExError {
         ArrayList<Transaction> list = new ArrayList<>();
         QFB((con) -> {
             FB_Query q = con.execute("SELECT FIRST " + limit + " SKIP " + offset + " "
                             + "DTSTART, DTEND, IDDCARD, CCARD, IDD, IDDAZS, IDDTRK, IDDOIL, IACCTYPE, DBPRICE, DBVOLREQ, DBVOLUME, DBSUMMA "
-                            + "FROM WP_REPORT_CLIENTTRANS(?,?,?,NULL, ?,?,?) "
+                            + "FROM WP_REPORT_CLIENTTRANS(?,?,?, ?,?,?,?) "
                             + (StringTools.isEmptySafe(sort) ? "" : " ORDER BY " + sort),
-                    iddfirm, iddclient, iddsub, dtstart, dtend, iddazs);
+                    iddfirm, iddclient, iddsub, dtstart, dtend, iddazs, iddcard);
             while (q.next()) {
                 list.add(new Transaction(
                         q.getLocalDateTime("DTSTART"),
@@ -329,9 +321,7 @@ public class AppModel {
     }
 
 
-    /**
-     * Создание каталога, если не существует.
-     */
+    /** Создание каталога, если не существует. */
     public static File createDirectoryIfNotExist(String path) throws ExError {
         try {
             File dir = new File(path);
@@ -348,9 +338,7 @@ public class AppModel {
         }
     }
 
-    /**
-     * Безопасное удаление файла.
-     */
+    /** Безопасное удаление файла. */
     public static void deleteFileSafe(String path) {
         try {
             File file = new File(path);

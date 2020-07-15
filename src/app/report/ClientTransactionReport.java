@@ -20,9 +20,10 @@ public class ClientTransactionReport extends BaseReport<ClientTransactionReport>
     private Client client;
     private LocalDate dtStart, dtEnd;
     private Integer iddAzs;
+    private String iddCard;
     private Mode mode;
 
-    private static final RGroup<Transaction, String> GROUP_CARD = new RGroup<>(1, "IDDCARD", Transaction::getCard);
+    private static final RGroup<Transaction, String> GROUP_CARD = new RGroup<>(1, "IDDCARD", Transaction::getCardTitle);
     private static final RGroup<Transaction, Oil> GROUP_OIL = new RGroup<>(2, "IDDOIL", Transaction::getOil);
 
     public enum Mode {
@@ -49,12 +50,13 @@ public class ClientTransactionReport extends BaseReport<ClientTransactionReport>
     }
 
 
-    public ClientTransactionReport(Client client, LocalDate dtstart, LocalDate dtend, Integer iddazs, Mode mode) throws ExError {
+    public ClientTransactionReport(Client client, LocalDate dtstart, LocalDate dtend, Integer iddazs, String iddcard, Mode mode) throws ExError {
         super(client.getFirm(), "Транзакции по картам клиента");
         this.client = client;
         this.dtStart = dtstart;
         this.dtEnd = dtend;
         this.iddAzs = iddazs;
+        this.iddCard = iddcard;
         this.mode = mode == null ? Mode.CARD_OIL_TIME : mode;
     }
 
@@ -65,6 +67,7 @@ public class ClientTransactionReport extends BaseReport<ClientTransactionReport>
         // Установка строки детализации названия отчёта.
         headerDetailText = client.getTitle() + "\n" + "за период c " + fmtDate8(dtStart) + " по " + fmtDate8(dtEnd);
         if (iddAzs != null) headerDetailText += " на АЗС №" + iddAzs;
+        if (iddCard != null) headerDetailText += " по карте №" + iddCard.substring(3);
 
         // Создаем первую страницу.
         newPage();
@@ -128,28 +131,28 @@ public class ClientTransactionReport extends BaseReport<ClientTransactionReport>
 
         @Override
         protected String getGroupHeadTitle(Transaction it) {
-            if (group == GROUP_CARD) return it.getCard() + ": " + it.getCardInfo();
+            if (group == GROUP_CARD) return it.getCardTitle() + ": " + it.getCardInfo();
             if (group == GROUP_OIL) return it.getOil().getAbbreviation();
             return "";
         }
 
         @Override
         protected String getSubGroupHeadTitle(Transaction it) {
-            if (subgroup == GROUP_CARD) return it.getCard() + ": " + it.getCardInfo();
+            if (subgroup == GROUP_CARD) return it.getCardTitle() + ": " + it.getCardInfo();
             if (subgroup == GROUP_OIL) return it.getOil().getAbbreviation();
             return "";
         }
 
         @Override
         protected String getGroupSummaryTitle(Transaction it) {
-            if (group == GROUP_CARD) return "Итого по карте " + it.getCard() + ": ";
+            if (group == GROUP_CARD) return "Итого по карте " + it.getCardTitle() + ": ";
             if (group == GROUP_OIL) return "Итого по " + it.getOil().getAbbreviation() + ": ";
             return "";
         }
 
         @Override
         protected String getSubGroupSummaryTitle(Transaction it) {
-            if (subgroup == GROUP_CARD) return "Итого по карте " + it.getCard() + ": ";
+            if (subgroup == GROUP_CARD) return "Итого по карте " + it.getCardTitle() + ": ";
             if (subgroup == GROUP_OIL) return "Итого по " + it.getOil().getAbbreviation() + ": ";
             return "";
         }
@@ -220,7 +223,7 @@ public class ClientTransactionReport extends BaseReport<ClientTransactionReport>
 
         @Override
         protected void buildDetail(Transaction it) {
-            String[] t = {fmtDT86(it.getStart()), it.getCard(), it.getOil().getAbbreviation()};
+            String[] t = {fmtDT86(it.getStart()), it.getCardTitle(), it.getOil().getAbbreviation()};
             XRText tx1 = hasGroup() ? crText("").lwTB(0f, 0f).transparent() : crText(t[colsO[0]]).center();
             XRText tx2 = hasSubGroup() ? crText("").lwTB(0f, 0f).transparent() : crText(t[colsO[1]]).center();
             XRBand band = new XRBand().style(tableDetailStyle).cols(colsW).rows(10)
@@ -257,7 +260,7 @@ public class ClientTransactionReport extends BaseReport<ClientTransactionReport>
         @Override
         protected ArrayList<Transaction> loadData(int skip, int limit) throws ExError {
             return model.loadClientTransactions(
-                    client.getFirm().id, client.getIdd(), client.getIddSub(), dtStart, dtEnd, iddAzs,
+                    client.getFirm().id, client.getIdd(), client.getIddSub(), dtStart, dtEnd, iddAzs, iddCard,
                     skip, limit, sortString);
         }
     }

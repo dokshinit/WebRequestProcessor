@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 public class Transaction {
 
     private LocalDateTime dtStart, dtEnd;
-    private String iddCard, cardInfo;
+    private String iddCard, cardTitle, cardInfo;
     private Integer idd, iddAzs, iddTrk;
     private Long dbPrice, dbVolReq, dbVolume, dbSumma; // коп. \ 10*мл.
     //
@@ -21,7 +21,8 @@ public class Transaction {
         this.idd = idd;
         this.dtStart = dtStart;
         this.dtEnd = dtEnd;
-        this.iddCard = iddCard.substring(3); // Для вывода, номера карт усекам до последних 6 знаков.
+        this.iddCard = iddCard;
+        this.cardTitle = iddCard.substring(3); // Для вывода, номера карт усекам до последних 6 знаков.
         this.cardInfo = cardInfo;
         this.iddAzs = iddAzs;
         this.iddTrk = iddTrk;
@@ -45,8 +46,12 @@ public class Transaction {
         return dtEnd;
     }
 
-    public String getCard() {
+    public String getCardIdd() {
         return iddCard;
+    }
+
+    public String getCardTitle() {
+        return cardTitle;
     }
 
     public String getCardInfo() {

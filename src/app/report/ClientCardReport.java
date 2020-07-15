@@ -142,7 +142,7 @@ public class ClientCardReport extends BaseReport<ClientCardReport> {
 
         @Override
         protected void buildDetail(Card it) {
-            String[] t = {it.getIddCard(), it.getWorkState().getTitle()};
+            String[] t = {it.getTitle(), it.getWorkState().getTitle()};
             XRText tx1 = hasGroup() ? crText("").lwTB(0f, 0f).transparent() : crText(t[colsO[0]]).center();
             XRText tx2 = hasSubGroup() ? crText("").lwTB(0f, 0f).transparent() : crText(t[colsO[1]]).center();
             XRBand band = new XRBand().style(tableDetailStyle).cols(colsW).rows(10)

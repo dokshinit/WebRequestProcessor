@@ -10,8 +10,8 @@ public class Card {
     public enum WorkState {
         WORK(1, "Рабочая", "Рабочие"),
         LOCK(0, "Запрет", "На запрете"),
-        ARREST(-1, "Арест", "Арестованные"),
-        DESTROY(-2, "Изъята", "Изъятые");
+        ARREST(-1, "Арест", "Арестованные");
+        //DESTROY(-2, "Изъята", "Изъятые");
 
         public int id;
         public String title, titleForMany;
@@ -42,7 +42,7 @@ public class Card {
     }
 
     private LocalDate dtw, dtwEnd;
-    private String iddCard;
+    private String idd, title; // idd-полный номер карты, title - сокращенный.
     private AccType accType;
     private WorkState workState;
     private LocalDate dtPay;
@@ -52,7 +52,8 @@ public class Card {
     public Card(LocalDate dtw, LocalDate dtwEnd, String iddCard, Integer iAccType, Integer iWork, LocalDate dtPay, String driver, String car, Long dbDayLimit, String comment) {
         this.dtw = dtw;
         this.dtwEnd = dtwEnd;
-        this.iddCard = iddCard.substring(3);
+        this.idd = iddCard;
+        this.title = iddCard.substring(3);
         this.accType = AccType.byId(iAccType);
         this.workState = WorkState.byId(iWork);
         this.dtPay = dtPay;
@@ -70,8 +71,12 @@ public class Card {
         return dtwEnd;
     }
 
-    public String getIddCard() {
-        return iddCard;
+    public String getIdd() {
+        return idd;
+    }
+
+    public String getTitle() {
+        return title;
     }
 
     public AccType getAccType() {

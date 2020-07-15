@@ -256,9 +256,10 @@ public class ServiceModel {
                 dtstart = req.getParamAsLocalDate("dtStart");
                 dtend = req.getParamAsLocalDate("dtEnd");
                 client = model.loadClient(req, dtend);
-                Integer iddAzs = req.getParamAsInteger("iddAzs");
+                Integer iddazs = req.getParamAsInteger("iddAzs");
+                String iddcard = req.getParamAsString("iddCard");
                 ClientTransactionReport.Mode mode = ClientTransactionReport.Mode.byId(req.getReportModeParam());
-                report = new ClientTransactionReport(client, dtstart, dtend, iddAzs, mode);
+                report = new ClientTransactionReport(client, dtstart, dtend, iddazs, iddcard, mode);
                 break;
 
             case CARD:
@@ -322,8 +323,9 @@ public class ServiceModel {
                 dtend = req.getParamAsLocalDate("dtEnd");
                 client = model.loadClient(req, dtend);
                 Integer iddAzs = req.getParamAsInteger("iddAzs");
+                String iddCard = req.getParamAsString("iddCard");
                 Integer mode = req.getExportModeParam();
-                export = new Export(client, dtstart, dtend, iddAzs, mode);
+                export = new Export(client, dtstart, dtend, iddAzs, iddCard, mode);
                 break;
 
             default:

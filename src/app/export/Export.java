@@ -21,19 +21,21 @@ public class Export {
     private Client client;
     private LocalDate dtStart, dtEnd;
     private Integer iddAzs;
+    private String iddCard;
     private Integer mode;
 
-    public Export(Client client, LocalDate dtStart, LocalDate dtEnd, Integer iddAzs, Integer mode) {
+    public Export(Client client, LocalDate dtStart, LocalDate dtEnd, Integer iddAzs, String iddCard, Integer mode) {
         this.client = client;
         this.dtStart = dtStart;
         this.dtEnd = dtEnd;
         this.iddAzs = iddAzs;
+        this.iddCard = iddCard;
         this.mode = mode;
     }
 
     private ArrayList<Transaction> loadTransactions(int skip) throws ExError {
         return model.loadClientTransactions(
-                client.getFirm().id, client.getIdd(), client.getIddSub(), dtStart, dtEnd, iddAzs,
+                client.getFirm().id, client.getIdd(), client.getIddSub(), dtStart, dtEnd, iddAzs, iddCard,
                 skip, 10000, "DTSTART,IDDAZS");
     }
 
@@ -79,7 +81,8 @@ public class Export {
             cell.setCellValue("Клиент СТК: " + client.getTitle() + " \n" +
                     "Транзакции отпуска топлива за период с " +
                     Helper.fmtDate8(dtStart) + " по " + Helper.fmtDate8(dtEnd) +
-                    (iddAzs == null || iddAzs == 0 ? "" : " на АЗС №" + iddAzs));
+                    (iddAzs == null || iddAzs == 0 ? "" : " на АЗС №" + iddAzs) +
+                    (iddCard == null ? "" : " по карте №" + iddCard.substring(3)));
             HSSFCellStyle stT = workbook.createCellStyle();
             HSSFFont font = workbook.createFont();
             font.setBold(true);
@@ -227,7 +230,7 @@ public class Export {
                     cell.setCellStyle(stNUM);
 
                     cell = row.createCell(++x);
-                    cell.setCellValue(t.getCard());
+                    cell.setCellValue(t.getCardTitle());
                     cell.setCellStyle(stCARD);
 
                     cell = row.createCell(++x);
