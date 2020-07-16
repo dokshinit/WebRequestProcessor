@@ -48,7 +48,7 @@ public class AppModel {
             cfg.load("app.config");
 
             base = cfg.getKey("db.host", "127.0.0.1") + ":" + cfg.getKey("db.alias", "WebCenter");
-            user = cfg.getKey("db.user", "REQUESTPROCESSOR");
+            user = cfg.getKey("db.user", "LK_REQUESTPROCESSOR");
             password = cfg.getKey("db.password", "xxxxxxxx");
 
             p_loadsize = cfg.getIntKey("processor.loadsize", 10);

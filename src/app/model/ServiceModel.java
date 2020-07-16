@@ -242,6 +242,8 @@ public class ServiceModel {
 
         BaseReport report;
         Client client;
+        Integer iddazs;
+        String iddcard;
         LocalDate dtstart, dtend, dtw;
 
         switch (req.getReportType()) {
@@ -256,8 +258,9 @@ public class ServiceModel {
                 dtstart = req.getParamAsLocalDate("dtStart");
                 dtend = req.getParamAsLocalDate("dtEnd");
                 client = model.loadClient(req, dtend);
-                Integer iddazs = req.getParamAsInteger("iddAzs");
-                String iddcard = req.getParamAsString("iddCard");
+                iddazs = req.getParamAsInteger("iddAzs");
+                iddcard = req.getParamAsString("iddCard");
+                if (isEmptySafe(iddcard)) iddcard = null;
                 ClientTransactionReport.Mode mode = ClientTransactionReport.Mode.byId(req.getReportModeParam());
                 report = new ClientTransactionReport(client, dtstart, dtend, iddazs, iddcard, mode);
                 break;
@@ -315,6 +318,8 @@ public class ServiceModel {
 
         Export export;
         Client client;
+        Integer iddazs;
+        String iddcard;
         LocalDate dtstart, dtend, dtw;
 
         switch (req.getExportType()) {
@@ -322,10 +327,11 @@ public class ServiceModel {
                 dtstart = req.getParamAsLocalDate("dtStart");
                 dtend = req.getParamAsLocalDate("dtEnd");
                 client = model.loadClient(req, dtend);
-                Integer iddAzs = req.getParamAsInteger("iddAzs");
-                String iddCard = req.getParamAsString("iddCard");
+                iddazs = req.getParamAsInteger("iddAzs");
+                iddcard = req.getParamAsString("iddCard");
+                if (isEmptySafe(iddcard)) iddcard = null;
                 Integer mode = req.getExportModeParam();
-                export = new Export(client, dtstart, dtend, iddAzs, iddCard, mode);
+                export = new Export(client, dtstart, dtend, iddazs, iddcard, mode);
                 break;
 
             default:
